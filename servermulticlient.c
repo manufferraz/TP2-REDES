@@ -11,7 +11,6 @@
   
 #define TRUE   1
 #define FALSE  0
-#define PORT 90100
 #define BUFSZ 500
 
 
@@ -54,15 +53,15 @@ int main(int argc , char *argv[])
     //type of socket created
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons( PORT );
+    address.sin_port = htons( argv[3] );
       
-    //bind the socket to localhost port 90100
+    //bind the socket to localhost in the defined port
     if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) 
     {
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
-    printf("Listener on port %d \n", PORT);
+    printf("Listener on port %d \n", argv[3]);
      
     // //try to specify maximum of 3 pending connections for the master socket
     // if (listen(master_socket, 3) < 0)
@@ -123,57 +122,75 @@ int main(int argc , char *argv[])
             //inform user of socket number - used in send and receive commands
             printf("[log] New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
         
-            //send new connection greeting message
-            if( send(new_socket, message, strlen(message), 0) != strlen(message) ) 
-            {
-                perror("send");
+            char buf[BUFSZ];
+            char comando[BUFSZ]; // Variável para armazenar a instrução recebida
+
+            memset(buf, 0, BUFSZ);
+
+            // Recebe o comando do cliente
+
+            ssize_t bytes_received = recv(new_socket, buf, BUFSZ, 0);
+
+            if (bytes_received == 0 ){
+                // flag = 0;
+            } else if (bytes_received > 0) {
+                // Copia o conteúdo recebido para 'comando'
+                strncpy(comando, buf, sizeof(comando) - 1);
+                comando[strcspn(comando, "\n")] = '\0';
+                printf("Comando recebido: %s\n", comando);
             }
+            //send new connection greeting message
+            // if( send(new_socket, message, strlen(message), 0) != strlen(message) ) 
+            // {
+            //     perror("send");
+            // }
               
-            puts("Welcome message sent successfully");
+            // puts("Welcome message sent successfully");
               
             //add new socket to array of sockets
-            for (i = 0; i < max_clients; i++) 
-            {
-                //if position is empty
-                if( client_socket[i] == 0 )
-                {
-                    client_socket[i] = new_socket;
-                    printf("Adding to list of sockets as %d\n" , i);
+        //     for (i = 0; i < max_clients; i++) 
+        //     {
+        //         //if position is empty
+        //         if( client_socket[i] == 0 )
+        //         {
+        //             client_socket[i] = new_socket;
+        //             printf("Adding to list of sockets as %d\n" , i);
                      
-                    break;
-                }
-            }
+        //             break;
+        //         }
+        //     }
         }
           
         //else its some IO operation on some other socket :)
-        for (i = 0; i < max_clients; i++) 
-        {
-            sd = client_socket[i];
+        // for (i = 0; i < max_clients; i++) 
+        // {
+        //     sd = client_socket[i];
               
-            if (FD_ISSET( sd , &readfds)) 
-            {
-                //Check if it was for closing , and also read the incoming message
-                if ((valread = read( sd , buffer, 1024)) == 0)
-                {
-                    //Somebody disconnected , get his details and print
-                    getpeername(sd , (struct sockaddr*)&address , (socklen_t*)&addrlen);
-                    printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+        //     if (FD_ISSET( sd , &readfds)) 
+        //     {
+        //         //Check if it was for closing , and also read the incoming message
+        //         if ((valread = read( sd , buffer, 1024)) == 0)
+        //         {
+        //             //Somebody disconnected , get his details and print
+        //             getpeername(sd , (struct sockaddr*)&address , (socklen_t*)&addrlen);
+        //             printf("Host disconnected , ip %s , port %d \n" , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
                       
-                    //Close the socket and mark as 0 in list for reuse
-                    close( sd );
-                    client_socket[i] = 0;
-                }
+        //             //Close the socket and mark as 0 in list for reuse
+        //             close( sd );
+        //             client_socket[i] = 0;
+        //         }
                   
                 //Echo back the message that came in
-                else
-                {
-                    //set the string terminating NULL byte on the end of the data read
-                    buffer[valread] = '\0';
-                    send(sd , buffer , strlen(buffer) , 0 );
-                }
-            }
-        }
-    }
-      
+                // else
+                // {
+                //     //set the string terminating NULL byte on the end of the data read
+                //     buffer[valread] = '\0';
+                //     send(sd , buffer , strlen(buffer) , 0 );
+                // }
+    //         }
+    //     }
+    // }
+    close(new_socket);
     return 0;
+}
 }
