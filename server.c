@@ -116,13 +116,6 @@ int main(int argc , char *argv[])
             //inform user of socket number - used in send and receive commands
             printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
         
-            // //send new connection greeting message
-            // if( send(new_socket, message, strlen(message), 0) != strlen(message) ) 
-            // {
-            //     perror("send");
-            // }
-              
-            // puts("Welcome message sent successfully");
               
             //add new socket to array of sockets
             for (i = 0; i < max_clients; i++) 
@@ -134,10 +127,12 @@ int main(int argc , char *argv[])
                     printf("Adding to list of sockets as %d\n" , i);
                      
                     break;
-                }
+                } //else if ()
             }
         }
           
+        char comando[BUFSZ]; // Variável para armazenar a instrução recebida
+
         //else its some IO operation on some other socket :)
         for (i = 0; i < max_clients; i++) 
         {
@@ -147,27 +142,17 @@ int main(int argc , char *argv[])
             memset(buf, 0, BUFSZ);
             sd = client_socket[i];
               
-            if (FD_ISSET( sd , &readfds)) 
+            if (FD_ISSET(sd , &readfds)) 
             {
                 //Check if it was for closing , and also read the incoming message
                 if ((valread = recv(sd , buffer, 1024, 0)) == 0)
                 {
-                   printf("entrou como se não tivesse recebido");
-                    strncpy(comando, buf, sizeof(comando) - 1);
-                    comando[strcspn(comando, "\n")] = '\0';
-                    printf("Comando recebido: %s\n", comando);
-                    //Close the socket and mark as 0 in list for reuse
                     close( sd );
                     client_socket[i] = 0;
+                } else {
+                    comando[strcspn(buffer, "\n")] = '\0';
+                    printf("Comando recebido: %s\n", comando);
                 }
-
-                ssize_t bytes_received = recv(new_socket, buf, BUFSZ, 0);
-                if (bytes_received > 0) {
-                // Copia o conteúdo recebido para 'comando'
-                strncpy(comando, buf, sizeof(comando) - 1);
-                comando[strcspn(comando, "\n")] = '\0';
-                printf("Comando recebido: %s\n", comando);
-            }
             }
         }
     }
