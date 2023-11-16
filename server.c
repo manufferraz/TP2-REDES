@@ -12,16 +12,15 @@
 #define TRUE   1
 #define FALSE  0
 #define BUFSZ 500
-
-
+ 
 int main(int argc , char *argv[])
 {
     int opt = TRUE;
-    int master_socket , addrlen , new_socket , client_socket[30] , max_clients = 30 , activity, i , valread , sd;
+    int master_socket , addrlen , new_socket , client_socket[10] , max_clients = 10 , activity, i , valread , sd;
     int max_sd;
     struct sockaddr_in address;
       
-    char buffer[500];  //data buffer of 1K
+    char buffer[1025];  //data buffer of 1K
       
     //set of socket descriptors
     fd_set readfds;
@@ -36,8 +35,7 @@ int main(int argc , char *argv[])
     }
       
     //create a master socket
-    master_socket = socket(AF_INET , SOCK_STREAM , 0);
-    if (master_socket == -1)
+    if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
     {
         perror("socket failed");
         exit(EXIT_FAILURE);
@@ -55,21 +53,21 @@ int main(int argc , char *argv[])
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons( atoi(argv[3]) );
       
-    //bind the socket to localhost in the defined port
+    //bind the socket to localhost port
     if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) 
     {
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
-    printf("Listener on port %s \n", argv[3]);
+    printf("Listener on port %d \n", argv[3]);
      
     //try to specify maximum of 3 pending connections for the master socket
-    if (listen(master_socket, 10) < 0)
+    if (listen(master_socket, 3) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-
+      
     //accept the incoming connection
     addrlen = sizeof(address);
     puts("Waiting for connections ...");
@@ -116,9 +114,17 @@ int main(int argc , char *argv[])
             }
           
             //inform user of socket number - used in send and receive commands
-            printf("[log] New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
+            printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
         
-        //add new socket to array of sockets
+            // //send new connection greeting message
+            // if( send(new_socket, message, strlen(message), 0) != strlen(message) ) 
+            // {
+            //     perror("send");
+            // }
+              
+            // puts("Welcome message sent successfully");
+              
+            //add new socket to array of sockets
             for (i = 0; i < max_clients; i++) 
             {
                 //if position is empty
@@ -131,7 +137,6 @@ int main(int argc , char *argv[])
                 }
             }
         }
-
           
         //else its some IO operation on some other socket :)
         for (i = 0; i < max_clients; i++) 
@@ -140,19 +145,30 @@ int main(int argc , char *argv[])
             char comando[BUFSZ]; // Variável para armazenar a instrução recebida
 
             memset(buf, 0, BUFSZ);
+            sd = client_socket[i];
+              
+            if (FD_ISSET( sd , &readfds)) 
+            {
+                //Check if it was for closing , and also read the incoming message
+                if ((valread = recv(sd , buffer, 1024, 0)) == 0)
+                {
+                   printf("entrou como se não tivesse recebido");
+                    strncpy(comando, buf, sizeof(comando) - 1);
+                    comando[strcspn(comando, "\n")] = '\0';
+                    printf("Comando recebido: %s\n", comando);
+                    //Close the socket and mark as 0 in list for reuse
+                    close( sd );
+                    client_socket[i] = 0;
+                }
 
-            // Recebe o comando do cliente
-
-            ssize_t bytes_received = recv(new_socket, buf, BUFSZ, 0);
-
-            if (bytes_received > 0) {
+                ssize_t bytes_received = recv(new_socket, buf, BUFSZ, 0);
+                if (bytes_received > 0) {
                 // Copia o conteúdo recebido para 'comando'
                 strncpy(comando, buf, sizeof(comando) - 1);
                 comando[strcspn(comando, "\n")] = '\0';
                 printf("Comando recebido: %s\n", comando);
             }
-                          
+            }
         }
     }
 }
-
