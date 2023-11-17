@@ -12,6 +12,57 @@
 #define TRUE   1
 #define FALSE  0
 #define BUFSZ 500
+
+#define NUM_SENSORES 3
+#define NUM_INFORMACOES 3
+
+// array bidimensional para representar os sensores
+double sensores[NUM_SENSORES][NUM_INFORMACOES] = {
+    {1, 750, 80},
+    {2, 1200, 95},
+    {3, 500, 60}
+};
+
+char* TrataMaxSensor() 
+{
+
+        char *comando = (char *)malloc(BUFSZ); 
+        snprintf(comando, BUFSZ, "REQ_LP");
+        
+        return comando;
+
+}
+
+char* TrataPotency() 
+{
+
+        char *comando = (char *)malloc(BUFSZ); 
+        snprintf(comando, BUFSZ, "REQ_LP");
+        
+        return comando;
+
+}
+
+char* TrataExternalPotency() 
+{
+
+        char *comando = (char *)malloc(BUFSZ); 
+        snprintf(comando, BUFSZ, "REQ_LP");
+        
+        return comando;
+
+}
+
+char* TrataGlobalMaxSensor() 
+{
+
+        char *comando = (char *)malloc(BUFSZ); 
+        snprintf(comando, BUFSZ, "REQ_LP");
+        
+        return comando;
+
+}
+
  
 int main(int argc , char *argv[])
 {
@@ -20,7 +71,7 @@ int main(int argc , char *argv[])
     int max_sd;
     struct sockaddr_in address;
       
-    char buffer[1025];  //data buffer of 1K
+    char buffer[500]; 
       
     //set of socket descriptors
     fd_set readfds;
@@ -150,8 +201,44 @@ int main(int argc , char *argv[])
                     close( sd );
                     client_socket[i] = 0;
                 } else {
+                    strncpy(comando, buffer, sizeof(comando) - 1);
                     comando[strcspn(buffer, "\n")] = '\0';
                     printf("Comando recebido: %s\n", comando);
+                    bzero(buffer, strlen(buffer)); // Limpa o buffer
+
+
+                // Trata o comando
+                if (strcmp(comando, "REQ_LS") == 0) {
+                    if (strcmp(comando[1], "param") != 0 && strcmp(comando[1], "file") != 0) {
+                        close(sd);
+                        printf("Invalid command.\n");
+                        exit(EXIT_SUCCESS);
+                    } else {
+                        char *comando = TrataInstall(comando);
+                            if (comando != NULL) {
+                                send(sd, comando, strlen(comando), 0);
+                                free(comando);
+                        }
+                    }
+                } else if (strcmp(comando, "REQ_LP") == 0) {
+                    char *comando = TrataRemove(comando);
+                        if (comando != NULL) {
+                            send(sd, comando, strlen(comando), 0);
+                            free(comando);
+                        }
+                } else if (strcmp(comando, "REQ_ES") == 0) {
+                    
+                } else if (strcmp(comando, "REQ_EP") == 0) {
+                    char *comando = TrataRemove(comando);
+                        if (comando != NULL) {
+                            send(sd, comando, strlen(comando), 0);
+                            free(comando);
+                        }
+                } else if (strcmp(comando, "REQ_MS") == 0) {
+                    
+                }else if (strcmp(comando, "REQ_MS") == 0) {
+                    
+                }     
                 }
             }
         }
