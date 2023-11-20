@@ -11,69 +11,74 @@
 
 #define BUFSZ 1024
 
-char* TrataLocal(char *instrucao[]) 
+void usage(int argc, char **argv)
 {
-    if ((strstr(instrucao, "maxsensor")) == 0) {                
+    printf("usage: %s <server ip> <server port>\n", argv[0]);
+    printf("example: %s 127.0.0.1 90100\n", argv[0]);
+    exit(EXIT_FAILURE);
+}
 
+char* TrataLocalMaxSensor() 
+{
         char *comando = (char *)malloc(BUFSZ); 
         snprintf(comando, BUFSZ, "REQ_LS");
         
         return comando;
-    } else if ((strstr(instrucao, "potency")) == 0) {
-
-        char *comando = (char *)malloc(BUFSZ); 
-        snprintf(comando, BUFSZ, "REQ_LP");
-        
-        return comando;
-    }
-
-    return NULL;
 }
 
-char* TrataExternal(char *instrucao[]) 
+char* TrataExternalMaxSensor() 
 {
-    if ((strstr(instrucao, "maxsensor")) == 0) {                
-
         char *comando = (char *)malloc(BUFSZ); 
         snprintf(comando, BUFSZ, "REQ_ES");
         
         return comando;
-    } else if ((strstr(instrucao, "potency")) == 0) {
+}
 
+char* TrataLocalPotency() 
+{
+        char *comando = (char *)malloc(BUFSZ); 
+        snprintf(comando, BUFSZ, "REQ_LP");
+        
+        return comando;
+}
+
+char* TrataExternalPotency() 
+{
         char *comando = (char *)malloc(BUFSZ); 
         snprintf(comando, BUFSZ, "REQ_EP");
         
         return comando;
-    }
-
-    return NULL;
 }
 
-char* TrataGlobal(char *instrucao[]) 
+char* TrataGlobalMaxSensor() 
 {
-    if ((strstr(instrucao, "maxsensor")) == 0) {                
-
         char *comando = (char *)malloc(BUFSZ); 
         snprintf(comando, BUFSZ, "REQ_MS");
         
         return comando;
-    } else if ((strstr(instrucao, "maxnetwork")) == 0) {
+}
 
+char* TrataGlobalMaxNetwork() 
+{
         char *comando = (char *)malloc(BUFSZ); 
         snprintf(comando, BUFSZ, "REQ_MN");
         
         return comando;
-    }
-
-    return NULL;
 }
 
 
 int main(int argc, char **argv)
 {
+    if (argc < 3)
+    {
+        usage(argc, argv);
+    }
+
     struct sockaddr_storage storage;                // estrutura de armazenamento p/ ipv6 ou ipv4
-     //type of socket created
-    storage.ss_family = AF_INET;
+    if (0 != addrParse(argv[1], argv[2], &storage)) // parsing criada em common.c (útil tbm para server) do endereço para dentro da estrutura
+    {
+        usage(argc, argv);
+    }
     
     // criação do socket
     int s = socket(storage.ss_family, SOCK_STREAM, 0); // CRIA SOCKET CONEXÃO INTERNET COM TCP (lib types e socket)
@@ -93,14 +98,14 @@ int main(int argc, char **argv)
 
     int selected = 0;
 
-     while (1) {
+    while (1) {
     char buf[BUFSZ];
     char string[BUFSZ]; // Variável para armazenar a string recebida
-    char comando[BUFSZ]; // Variável para armazenar a comando recebida
+    char mensagem[BUFSZ]; // Variável para armazenar a mensagem recebida
 
     memset(buf, 0, BUFSZ);
 
-    // Recebe a instrução do terminal
+    // Recebe o instrução do terminal
     fgets(buf, sizeof(buf), stdin);
     strncpy(string, buf, sizeof(string) - 1);
 
@@ -111,51 +116,86 @@ int main(int argc, char **argv)
 
     // Processa a instrução e cria um array de elementos
     char *instrucao[BUFSZ];
-    char *mensagem[BUFSZ];
     int numTokens = 0;
 
-    // Trata a instrução
-    if ((strstr(instrucao, "external")) == 0) {  
-
-        char *comando =  instalarSensor();
-        if (comando != NULL) {
-            send(s, comando, strlen(comando), 0);
-            free(comando);
-        }
-    } else if ((strstr(instrucao, "local")) == 0) {                
-
-        char *comando = TrataLocal(instrucao);
-        if (comando != NULL) {
-            send(s, comando, strlen(comando), 0);
-            free(comando);
-        }
-    } else if ((strstr(instrucao, "global")) == 0) {                
-
-        char *comando = TrataGlobal(instrucao);
-        if (comando != NULL) {
-            send(s, comando, strlen(comando), 0);
-            free(comando);
-        }
-    } else if (strcmp(comando, "kill") == 0) {
-        close(s);
-        printf("Servidor encerrado pelo cliente.\n");
-        exit(EXIT_SUCCESS);
-    } 
-
-    bzero(buf, strlen(buf));
-
-    // Recebe a mensagem do servidor
-    ssize_t bytes_received = recv(s, buf, BUFSZ, 0);
-
-    if (bytes_received > 0) {
-        // Copia o conteúdo recebido para 'mensagem'
-        strncpy(mensagem, buf, sizeof(mensagem) - 1);
-        mensagem[strcspn(mensagem, "\n")] = '\0';
-
-        printf("comando recebido: %s\n", mensagem);
+    for (int i = 0; i < BUFSZ; i++ ){
+        instrucao[i] = "-1";
     }
 
-}
+    char temp[BUFSZ];
+    strcpy(temp, string); 
+    char *token = strtok(temp, " ");
+    while (token != NULL) {
+        instrucao[numTokens++] = token;
+        token = strtok(NULL, " ");
+    }
+
+
+    // Verifica se a primeira posição do array é igual a "install"
+    if (numTokens > 0 && strcmp(instrucao[0], "show") == 0) {
+        if (numTokens > 0 && strcmp(instrucao[1], "localmaxsensor") == 0) {
+            char *comando = TrataLocalMaxSensor();
+            if (comando != NULL) {
+                send(s, comando, strlen(comando), 0);
+                free(comando);
+            }
+        } else if (numTokens > 0 && strcmp(instrucao[1], "externalmaxsensor") == 0) {
+            char *comando = TrataExternalMaxSensor();
+            if (comando != NULL) {
+                send(s, comando, strlen(comando), 0);
+                free(comando);
+            }
+        } else if (numTokens > 0 && strcmp(instrucao[1], "localpotency") == 0) {
+            char *comando = TrataLocalPotency();
+            if (comando != NULL) {
+                printf("%s", comando);
+                send(s, comando, strlen(comando), 0);
+                free(comando);
+            }
+        } else if (numTokens > 0 && strcmp(instrucao[1], "externalpotency") == 0) {
+            char *comando = TrataExternalPotency();
+            if (comando != NULL) {
+                send(s, comando, strlen(comando), 0);
+                free(comando);
+            }
+        } else if (numTokens > 0 && strcmp(instrucao[1], "globalmaxsensor") == 0) {
+            char *comando = TrataGlobalMaxSensor();
+            if (comando != NULL) {
+                send(s, comando, strlen(comando), 0);
+                free(comando);
+            }
+        } else if (numTokens > 0 && strcmp(instrucao[1], "globalmaxnetwork") == 0) {
+            char *comando = TrataGlobalMaxNetwork();
+            if (comando != NULL) {
+                send(s, comando, strlen(comando), 0);
+                free(comando);
+            }
+        } else if (strcmp(string, "kill") == 0) {
+            send(s, string, strlen(string), 0);
+            close(s);
+            printf("Servidor encerrado pelo cliente.\n");
+            exit(EXIT_SUCCESS);
+        } else {
+            close(s);
+            printf("Invalid command.\n");
+            exit(EXIT_SUCCESS);
+        }
+
+        bzero(buf, strlen(buf));
+
+        // Recebe a mensagem do servidor
+        ssize_t bytes_received = recv(s, buf, BUFSZ, 0);
+
+        if (bytes_received > 0) {
+            // Copia o conteúdo recebido para 'mensagem'
+            strncpy(mensagem, buf, sizeof(mensagem) - 1);
+            mensagem[strcspn(mensagem, "\n")] = '\0';
+
+            printf("mensagem recebida: %s\n", mensagem);
+        }
+
+    }
+    }
 	close(s);
     return 0;
     }

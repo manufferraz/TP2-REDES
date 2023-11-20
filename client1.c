@@ -65,7 +65,6 @@ int main(int argc, char **argv)
 
     // Remove a quebra de linha do final da string
     string[strcspn(string, "\n")] = '\0';
-    printf("%s\n", string);
 
     bzero(buf, strlen(buf));
 

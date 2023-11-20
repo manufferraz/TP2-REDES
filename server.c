@@ -16,68 +16,115 @@
 #define NUM_SENSORES 3
 #define NUM_INFORMACOES 3
 
-// array bidimensional para representar os sensores
-double sensores[NUM_SENSORES][NUM_INFORMACOES] = {
+// Definir uma struct para representar um sensor
+typedef struct {
+    int id;
+    double potencia;
+    double eficiencia_energetica;
+} Sensor;
+
+// Array de sensores (declarado globalmente)
+Sensor sensores[NUM_SENSORES] = {
     {1, 750, 80},
     {2, 1200, 95},
     {3, 500, 60}
 };
 
-char* TrataMaxSensor() 
+char* TrataLocalMaxSensor() 
 {
+    // Encontrar o sensor com a maior potência útil
+    double maxPotUtil = 0;
+    int sensorId = -1;
 
-        char *comando = (char *)malloc(BUFSZ); 
-        snprintf(comando, BUFSZ, "REQ_LP");
-        
-        return comando;
+    for (int i = 0; i < NUM_SENSORES; ++i) {
+        double potUtil = sensores[i].potencia * sensores[i].eficiencia_energetica / 100.0;
+
+        if (potUtil > maxPotUtil) {
+            maxPotUtil = potUtil;
+            sensorId = sensores[i].id;
+        }
+    }
+
+    // Alocar espaço para a mensagem
+    char *mensagem = (char *)malloc(BUFSZ); 
+    // Construir a mensagem
+    sprintf(mensagem, "local %d sensor %d: %.2f (%.2f %.2f)", sensores[sensorId - 1].id, sensorId, maxPotUtil, sensores[sensorId - 1].potencia, sensores[sensorId - 1].eficiencia_energetica);        
+    
+    return mensagem;
+}
+
+char* TrataExternalMaxSensor() 
+{
+    // Encontrar o sensor com a maior potência útil
+    double maxPotUtil = 0;
+    int sensorId = -1;
+
+    for (int i = 0; i < NUM_SENSORES; ++i) {
+        double potUtil = sensores[i].potencia * sensores[i].eficiencia_energetica / 100.0;
+
+        if (potUtil > maxPotUtil) {
+            maxPotUtil = potUtil;
+            sensorId = sensores[i].id;
+        }
+    }
+
+    // Alocar espaço para a mensagem
+        char *mensagem = (char *)malloc(BUFSZ); 
+    // Construir a mensagem
+    sprintf(mensagem, "local %d sensor %d: %.2f (%.2f %.2f)", sensores[sensorId - 1].id, sensorId, maxPotUtil, sensores[sensorId - 1].potencia, sensores[sensorId - 1].eficiencia_energetica);        
+    
+    return mensagem;
 
 }
 
-char* TrataPotency() 
+char* TrataLocalPotency() 
 {
+double somatorio = 0;
 
-        char *comando = (char *)malloc(BUFSZ); 
-        snprintf(comando, BUFSZ, "REQ_LP");
-        
-        return comando;
+    for (int i = 0; i < NUM_SENSORES; ++i) {
+        somatorio += sensores[i].potencia * sensores[i].eficiencia_energetica / 100.0;
+    }
 
+    // Simula a criação da mensagem RES_LP
+    char *mensagem = (char *)malloc(BUFSZ); 
+    sprintf(mensagem, "local PidMi potency: %.2f", somatorio);
+
+    return mensagem;
 }
 
 char* TrataExternalPotency() 
 {
 
-        char *comando = (char *)malloc(BUFSZ); 
-        snprintf(comando, BUFSZ, "REQ_LP");
+        char *mensagem = (char *)malloc(BUFSZ); 
+        snprintf(mensagem, BUFSZ, "REQ_LP");
         
-        return comando;
+        return mensagem;
 
 }
 
 char* TrataGlobalMaxSensor() 
 {
 
-        char *comando = (char *)malloc(BUFSZ); 
-        snprintf(comando, BUFSZ, "REQ_LP");
+        char *mensagem = (char *)malloc(BUFSZ); 
+        snprintf(mensagem, BUFSZ, "REQ_LP");
         
-        return comando;
+        return mensagem;
 
 }
 
  
-int main(int argc , char *argv[])
+int main(int argc , char **argv)
 {
     int opt = TRUE;
-    int master_socket , addrlen , new_socket , client_socket[10] , max_clients = 10 , activity, i , valread , sd;
+    int master_socket , addrlen , new_socket , p2p_socket , client_socket[10] , max_clients = 10 , activity, i , valread , sd;
     int max_sd;
     struct sockaddr_in address;
+    struct sockaddr_in address_p2p;
       
     char buffer[500]; 
       
     //set of socket descriptors
     fd_set readfds;
-      
-    //a message
-    char *message = "ECHO Daemon v1.0 \r\n";
   
     //initialise all client_socket[] to 0 so not checked
     for (i = 0; i < max_clients; i++) 
@@ -87,6 +134,13 @@ int main(int argc , char *argv[])
       
     //create a master socket
     if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
+    {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    //create a p2p socket
+    if( (p2p_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
     {
         perror("socket failed");
         exit(EXIT_FAILURE);
@@ -102,15 +156,27 @@ int main(int argc , char *argv[])
     //type of socket created
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons( atoi(argv[3]) );
+    address.sin_port = htons(atoi(argv[3]));
+
+    //type of socket created
+    address_p2p.sin_family = AF_INET;
+    address_p2p.sin_addr.s_addr = INADDR_ANY;
+    address_p2p.sin_port = htons(atoi(argv[2]));
       
-    //bind the socket to localhost port
+    //bind the master socket to localhost port
     if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) 
     {
-        perror("bind failed");
+        perror("master bind failed");
         exit(EXIT_FAILURE);
     }
-    printf("Listener on port %d \n", argv[3]);
+    printf("Listener on port %d \n", address.sin_port);
+
+    //bind the p2p socket to localhost port
+    if (bind(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p))<0) 
+    {
+        perror("p2p bind failed");
+        exit(EXIT_FAILURE);
+    }
      
     //try to specify maximum of 3 pending connections for the master socket
     if (listen(master_socket, 3) < 0)
@@ -121,7 +187,7 @@ int main(int argc , char *argv[])
       
     //accept the incoming connection
     addrlen = sizeof(address);
-    puts("Waiting for connections ...");
+    puts("No peer found, starting to listen...");
      
     while(TRUE) 
     {
@@ -178,7 +244,7 @@ int main(int argc , char *argv[])
                     printf("Adding to list of sockets as %d\n" , i);
                      
                     break;
-                } //else if ()
+                } 
             }
         }
           
@@ -195,52 +261,67 @@ int main(int argc , char *argv[])
               
             if (FD_ISSET(sd , &readfds)) 
             {
-                //Check if it was for closing , and also read the incoming message
-                if ((valread = recv(sd , buffer, 1024, 0)) == 0)
+                if ((valread = recv(sd , buffer, BUFSZ, 0)) == 0)
                 {
                     close( sd );
                     client_socket[i] = 0;
+
                 } else {
                     strncpy(comando, buffer, sizeof(comando) - 1);
-                    comando[strcspn(buffer, "\n")] = '\0';
+                    comando[strcspn(comando, "\n")] = '\0';
                     printf("Comando recebido: %s\n", comando);
                     bzero(buffer, strlen(buffer)); // Limpa o buffer
 
 
-                // Trata o comando
-                if (strcmp(comando, "REQ_LS") == 0) {
-                    if (strcmp(comando[1], "param") != 0 && strcmp(comando[1], "file") != 0) {
-                        close(sd);
-                        printf("Invalid command.\n");
-                        exit(EXIT_SUCCESS);
-                    } else {
-                        char *comando = TrataInstall(comando);
-                            if (comando != NULL) {
-                                send(sd, comando, strlen(comando), 0);
-                                free(comando);
+                    // Trata o comando
+                    if (strcmp(comando, "REQ_LS") == 0) {
+                        char *mensagem = TrataLocalMaxSensor();
+                        if (mensagem != NULL) {
+                            send(sd, mensagem, strlen(mensagem), 0);
+                            free(mensagem);
                         }
-                    }
-                } else if (strcmp(comando, "REQ_LP") == 0) {
-                    char *comando = TrataRemove(comando);
-                        if (comando != NULL) {
-                            send(sd, comando, strlen(comando), 0);
-                            free(comando);
-                        }
-                } else if (strcmp(comando, "REQ_ES") == 0) {
-                    
-                } else if (strcmp(comando, "REQ_EP") == 0) {
-                    char *comando = TrataRemove(comando);
-                        if (comando != NULL) {
-                            send(sd, comando, strlen(comando), 0);
-                            free(comando);
-                        }
-                } else if (strcmp(comando, "REQ_MS") == 0) {
-                    
-                }else if (strcmp(comando, "REQ_MS") == 0) {
-                    
-                }     
+                    } else if (strcmp(comando, "REQ_LP") == 0) {
+                        char *mensagem = TrataLocalPotency();
+                            if (mensagem != NULL) {
+                                send(sd, mensagem, strlen(mensagem), 0);
+                                free(mensagem);
+                            }
+                    } else if (strcmp(comando, "REQ_ES") == 0) {
+                        // Logica externa
+                        char *mensagem = "REQ_LS";
+                            if (mensagem != NULL) {
+                                send(p2p_socket, mensagem, strlen(mensagem), 0);
+                                char *msg_external = recv(p2p_socket , buffer, BUFSZ, 0);
+                                send(sd, msg_external, strlen(msg_external), 0);
+                                free(mensagem);
+                                free(msg_external);
+                            }
+                    } else if (strcmp(comando, "REQ_EP") == 0) {
+                        // Logica externa
+                        char *mensagem = "REQ_LP";
+                            if (mensagem != NULL) {
+                                send(p2p_socket, mensagem, strlen(mensagem), 0);
+                                char *msg_external = recv(p2p_socket , buffer, BUFSZ, 0);
+                                send(sd, msg_external, strlen(msg_external), 0);
+                                free(mensagem);
+                                free(msg_external);
+                            }
+                    } else if (strcmp(comando, "REQ_MS") == 0) {
+                        char *mensagem = TrataGlobalMaxSensor();
+                            if (mensagem != NULL) {
+                                send(sd, mensagem, strlen(mensagem), 0);
+                                free(mensagem);
+                            }
+                    }else if (strcmp(comando, "REQ_MN") == 0) {
+                        char *mensagem = TrataGlobalMaxSensor();
+                            if (mensagem != NULL) {
+                                send(sd, mensagem, strlen(mensagem), 0);
+                                free(mensagem);
+                            }
+                    }     
                 }
-            }
+            } 
+            // if
         }
     }
 }
