@@ -8,6 +8,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/time.h> //FD_SET, FD_ISSET, FD_ZERO macros
+#include <asm-generic/socket.h>
+#include <stdbool.h>
   
 #define TRUE   1
 #define FALSE  0
@@ -116,16 +118,19 @@ char* TrataGlobalMaxSensor()
 int main(int argc , char **argv)
 {
     int opt = TRUE;
-    int master_socket , addrlen , new_socket , p2p_socket , client_socket[10] , max_clients = 10 , activity, i , valread , sd;
-    int max_sd;
+    int master_socket , addrlen , new_socket , client_socket[10] , max_clients = 10 , activity, i , valread , sd;
+    int max_sd, p2p_socket, new_p2p_socket;
     struct sockaddr_in address;
     struct sockaddr_in address_p2p;
+    socklen_t caddrlen = sizeof(address_p2p);
+
       
     char buffer[500]; 
       
     //set of socket descriptors
     fd_set readfds;
-  
+    fd_set p2p_readfds;
+
     //initialise all client_socket[] to 0 so not checked
     for (i = 0; i < max_clients; i++) 
     {
@@ -142,15 +147,22 @@ int main(int argc , char **argv)
     //create a p2p socket
     if( (p2p_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
     {
-        perror("socket failed");
+        perror("p2p socket creation failed");
         exit(EXIT_FAILURE);
     }
   
     //set master socket to allow multiple connections , this is just a good habit, it will work without this
-    if( setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0 )
+    if( setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char *)&opt, sizeof(opt)) != 0 )
     {
         perror("setsockopt");
         exit(EXIT_FAILURE);
+    }
+
+    //set p2p socket to allow multiple connections , this is just a good habit, it will work without this
+    if(0 != setsockopt(p2p_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char *)&opt, sizeof(opt)))
+    {
+         perror("Reuso de porta recusado"); 
+         exit(EXIT_FAILURE);
     }
   
     //type of socket created
@@ -184,16 +196,38 @@ int main(int argc , char **argv)
         perror("listen");
         exit(EXIT_FAILURE);
     }
-      
+    
+    // Escute por conexões peer-to-peer
+    if (listen(p2p_socket, 3) < 0) {
+        perror("p2p listen failed");
+        exit(EXIT_FAILURE);
+    }
+
     //accept the incoming connection
     addrlen = sizeof(address);
     puts("No peer found, starting to listen...");
      
+    int flag = 0;
+    
     while(TRUE) 
     {
+         if(flag == 0){
+        int p2p = accept(p2p_socket, &address_p2p, &caddrlen);
+            if (p2p == -1)
+            {
+                logExit("accept");
+        }
+
+        char caddrstr[BUFSZ];
+        addrToStr(address_p2p, caddrstr, BUFSZ);
+        printf("[log] connection from peer %s\n", caddrstr);
+
+        flag = 1;
+        }
+
         //clear the socket set
         FD_ZERO(&readfds);
-  
+          
         //add master socket to set
         FD_SET(master_socket, &readfds);
         max_sd = master_socket;
@@ -232,7 +266,7 @@ int main(int argc , char **argv)
           
             //inform user of socket number - used in send and receive commands
             printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));
-        
+                
               
             //add new socket to array of sockets
             for (i = 0; i < max_clients; i++) 
