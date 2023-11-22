@@ -137,12 +137,7 @@ int main(int argc , char **argv)
         client_socket[i] = 0;
     }
       
-    //create a master socket
-    if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
-    {
-        perror("socket failed");
-        exit(EXIT_FAILURE);
-    }
+    
 
     //create a p2p socket
     if( (p2p_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
@@ -151,12 +146,7 @@ int main(int argc , char **argv)
         exit(EXIT_FAILURE);
     }
   
-    //set master socket to allow multiple connections , this is just a good habit, it will work without this
-    if( setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char *)&opt, sizeof(opt)) != 0 )
-    {
-        perror("setsockopt");
-        exit(EXIT_FAILURE);
-    }
+    
 
     //set p2p socket to allow multiple connections , this is just a good habit, it will work without this
     if(0 != setsockopt(p2p_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char *)&opt, sizeof(opt)))
@@ -165,51 +155,113 @@ int main(int argc , char **argv)
          exit(EXIT_FAILURE);
     }
   
-    //type of socket created
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(atoi(argv[3]));
+    
 
     //type of socket created
     address_p2p.sin_family = AF_INET;
     address_p2p.sin_addr.s_addr = INADDR_ANY;
     address_p2p.sin_port = htons(atoi(argv[2]));
-      
-      
-    if (0 != connect(p2p_socket, &address_p2p, caddrlen))            // CONECTA NO SOCKET
+
+    //create a master socket
+    if( (master_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) 
     {
-        logExit("connect");
-    } else {
-        //bind the p2p socket to localhost port
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+    
+    //set master socket to allow multiple connections , this is just a good habit, it will work without this
+    if( setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, (char *)&opt, sizeof(opt)) != 0 )
+    {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+
+    //type of socket created
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(atoi(argv[3]));
+    
+    
+    ///////////////////////// p2p ///////////////////////////////
+    
+    int x = connect(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p));
+    if (x < 0)            // CONECTA NO SOCKET
+    {
+        // logExit("connect");
         if (bind(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p))<0) 
         {
             perror("p2p bind failed");
-            exit(EXIT_FAILURE);
+            //exit(EXIT_FAILURE);
+        }  
+        int listening = listen(p2p_socket, 3); 
+        if (listening < 0){
+            perror("p2p listen failed");
+            //exit(EXIT_FAILURE);
+        }
+
+        puts("No peer found, starting to listen...");
+
+        if ((new_p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen)) < 0) {
+        perror("p2p accept failed");
+        } else {
+            printf("Peer 2 connected\n");
+        }
+        char req[BUFSZ]; // Variável para armazenar a instrução recebida
+        char res[BUFSZ];
+
+        if (recv(p2p_socket, req, BUFSZ, 0) < 0){
+                perror("recv server server");
+            } else {
+                int PidM = 1;
+
+                if(strcmp(req, "REQ_ADDPEER")){
+
+                    printf("Peer %d connected\n", PidM);
+                    sprintf(res, "RES_ADDPEER(%d)", PidM);
+                    send(p2p_socket, res, BUFSZ, 0);
+            }
         }
         
-        // Escute por conexões peer-to-peer
-        if (listen(p2p_socket, 1) < 0) {
-            perror("p2p listen failed");
-            exit(EXIT_FAILURE);
+        printf("%s\n", res);
+        //recv send
+    } else {
+        char req[BUFSZ]; // Variável para armazenar a instrução recebida
+        char res[BUFSZ];
+
+        //send recv
+        send(p2p_socket, "REQ_ADDPEER", BUFSZ, 0);
+
+        char teste[BUFSZ]; // Variável para armazenar a instrução recebida
+
+        if (recv(p2p_socket, req, BUFSZ, 0) == 0){
+                perror("recv server client");
+            } else {
+                int PidM = 1;
+
+                if(strcmp(req, "RES_ADDPEER(1)")){
+
+                    printf("New peer ID: 1\n");
+            }
         }
+        printf("%s", teste);
+
     }
-
-
+    
     //bind the master socket to localhost port
     if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) 
     {
         perror("master bind failed");
-        exit(EXIT_FAILURE);
-    }
+        //exit(EXIT_FAILURE);
+    }  
+    
     printf("Listener on port %d \n", address.sin_port);
 
     //try to specify maximum of 10 pending connections for the master socket
     if (listen(master_socket, 10) < 0)
     {
         perror("listen");
-        exit(EXIT_FAILURE);
+        //exit(EXIT_FAILURE);
     }
-    
     
     while(TRUE) 
     {
@@ -248,7 +300,7 @@ int main(int argc , char **argv)
         {
             if ((new_socket = accept(master_socket, (struct sockaddr *)&address, (socklen_t*)&addrlen))<0)
             {
-                perror("accept");
+                perror("accept master");
                 exit(EXIT_FAILURE);
             }
           
@@ -272,15 +324,6 @@ int main(int argc , char **argv)
 
         //accept the incoming connection
         addrlen = sizeof(address);
-        puts("No peer found, starting to listen...");
-
-        if ((new_p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen)) < 0) {
-        perror("p2p accept failed");
-        } else {
-            char caddrstr[BUFSZ];
-            addrToStr(address_p2p, caddrstr, BUFSZ);
-            printf("Peer %s connected\n", caddrstr);
-        }
 
 
         char comando[BUFSZ]; // Variável para armazenar a instrução recebida
