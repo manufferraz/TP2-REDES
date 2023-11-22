@@ -123,7 +123,7 @@ int main(int argc , char **argv)
     struct sockaddr_in address;
     struct sockaddr_in address_p2p;
     socklen_t caddrlen = sizeof(address_p2p);
-
+    struct sockaddr_storage storage;                // estrutura de armazenamento p/ ipv6 ou ipv4
       
     char buffer[500]; 
       
@@ -175,6 +175,26 @@ int main(int argc , char **argv)
     address_p2p.sin_addr.s_addr = INADDR_ANY;
     address_p2p.sin_port = htons(atoi(argv[2]));
       
+      
+    if (0 != connect(p2p_socket, &address_p2p, caddrlen))            // CONECTA NO SOCKET
+    {
+        logExit("connect");
+    } else {
+        //bind the p2p socket to localhost port
+        if (bind(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p))<0) 
+        {
+            perror("p2p bind failed");
+            exit(EXIT_FAILURE);
+        }
+        
+        // Escute por conexões peer-to-peer
+        if (listen(p2p_socket, 1) < 0) {
+            perror("p2p listen failed");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+
     //bind the master socket to localhost port
     if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) 
     {
@@ -183,48 +203,16 @@ int main(int argc , char **argv)
     }
     printf("Listener on port %d \n", address.sin_port);
 
-    //bind the p2p socket to localhost port
-    if (bind(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p))<0) 
-    {
-        perror("p2p bind failed");
-        exit(EXIT_FAILURE);
-    }
-     
-    //try to specify maximum of 3 pending connections for the master socket
-    if (listen(master_socket, 3) < 0)
+    //try to specify maximum of 10 pending connections for the master socket
+    if (listen(master_socket, 10) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
     }
     
-    // Escute por conexões peer-to-peer
-    if (listen(p2p_socket, 3) < 0) {
-        perror("p2p listen failed");
-        exit(EXIT_FAILURE);
-    }
-
-    //accept the incoming connection
-    addrlen = sizeof(address);
-    puts("No peer found, starting to listen...");
-     
-    int flag = 0;
     
     while(TRUE) 
     {
-         if(flag == 0){
-        int p2p = accept(p2p_socket, &address_p2p, &caddrlen);
-            if (p2p == -1)
-            {
-                logExit("accept");
-        }
-
-        char caddrstr[BUFSZ];
-        addrToStr(address_p2p, caddrstr, BUFSZ);
-        printf("[log] connection from peer %s\n", caddrstr);
-
-        flag = 1;
-        }
-
         //clear the socket set
         FD_ZERO(&readfds);
           
@@ -281,7 +269,20 @@ int main(int argc , char **argv)
                 } 
             }
         }
-          
+
+        //accept the incoming connection
+        addrlen = sizeof(address);
+        puts("No peer found, starting to listen...");
+
+        if ((new_p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen)) < 0) {
+        perror("p2p accept failed");
+        } else {
+            char caddrstr[BUFSZ];
+            addrToStr(address_p2p, caddrstr, BUFSZ);
+            printf("Peer %s connected\n", caddrstr);
+        }
+
+
         char comando[BUFSZ]; // Variável para armazenar a instrução recebida
 
         //else its some IO operation on some other socket :)
@@ -304,7 +305,7 @@ int main(int argc , char **argv)
                     strncpy(comando, buffer, sizeof(comando) - 1);
                     comando[strcspn(comando, "\n")] = '\0';
                     printf("Comando recebido: %s\n", comando);
-                    bzero(buffer, strlen(buffer)); // Limpa o buffer
+                    // bzero(buffer, strlen(buffer)); // Limpa o buffer
 
 
                     // Trata o comando
@@ -355,7 +356,6 @@ int main(int argc , char **argv)
                     }     
                 }
             } 
-            // if
         }
     }
 }
