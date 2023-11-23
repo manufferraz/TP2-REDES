@@ -154,8 +154,6 @@ int main(int argc , char **argv)
          perror("Reuso de porta recusado"); 
          exit(EXIT_FAILURE);
     }
-  
-    
 
     //type of socket created
     address_p2p.sin_family = AF_INET;
@@ -181,72 +179,6 @@ int main(int argc , char **argv)
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(atoi(argv[3]));
     
-    
-    ///////////////////////// p2p ///////////////////////////////
-    
-    int x = connect(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p));
-    if (x < 0)            // CONECTA NO SOCKET
-    {
-        // logExit("connect");
-        if (bind(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p))<0) 
-        {
-            perror("p2p bind failed");
-            //exit(EXIT_FAILURE);
-        }  
-        int listening = listen(p2p_socket, 3); 
-        if (listening < 0){
-            perror("p2p listen failed");
-            //exit(EXIT_FAILURE);
-        }
-
-        puts("No peer found, starting to listen...");
-
-        if ((new_p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen)) < 0) {
-        perror("p2p accept failed");
-        } else {
-            printf("Peer 2 connected\n");
-        }
-        char req[BUFSZ]; // Variável para armazenar a instrução recebida
-        char res[BUFSZ];
-
-        if (recv(p2p_socket, req, BUFSZ, 0) < 0){
-                perror("recv server server");
-            } else {
-                int PidM = 1;
-
-                if(strcmp(req, "REQ_ADDPEER")){
-
-                    printf("Peer %d connected\n", PidM);
-                    sprintf(res, "RES_ADDPEER(%d)", PidM);
-                    send(p2p_socket, res, BUFSZ, 0);
-            }
-        }
-        
-        printf("%s\n", res);
-        //recv send
-    } else {
-        char req[BUFSZ]; // Variável para armazenar a instrução recebida
-        char res[BUFSZ];
-
-        //send recv
-        send(p2p_socket, "REQ_ADDPEER", BUFSZ, 0);
-
-        char teste[BUFSZ]; // Variável para armazenar a instrução recebida
-
-        if (recv(p2p_socket, req, BUFSZ, 0) == 0){
-                perror("recv server client");
-            } else {
-                int PidM = 1;
-
-                if(strcmp(req, "RES_ADDPEER(1)")){
-
-                    printf("New peer ID: 1\n");
-            }
-        }
-        printf("%s", teste);
-
-    }
-    
     //bind the master socket to localhost port
     if (bind(master_socket, (struct sockaddr *)&address, sizeof(address))<0) 
     {
@@ -263,6 +195,63 @@ int main(int argc , char **argv)
         //exit(EXIT_FAILURE);
     }
     
+    ///////////////////////// p2p ///////////////////////////////
+    
+    int x = connect(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p));
+    if (x < 0)            // CONECTA NO SOCKET
+    {
+        if (bind(p2p_socket, (struct sockaddr *)&address_p2p, sizeof(address_p2p))<0) 
+        {
+            perror("p2p bind failed");
+        }  
+        int listening = listen(p2p_socket, 3); 
+        if (listening < 0){
+            perror("p2p listen failed");
+        }
+
+        puts("No peer found, starting to listen...");
+
+        int new_p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen);
+        if (new_p2p_socket < 0) {
+            perror("p2p accept failed");
+        } else {
+            printf("Peer 2 connected\n");
+
+            char req[BUFSZ];
+            char res[BUFSZ];
+
+            if (recv(new_p2p_socket, req, BUFSZ, 0) < 0) {
+                perror("recv server server");
+            } else {
+                int PidM = 1;
+                if(strcmp(req, "REQ_ADDPEER")){
+
+                    printf("Peer %d connected\n", PidM);
+                    sprintf(res, "RES_ADDPEER(%d)", PidM);
+                }
+                    send(new_p2p_socket, res, BUFSZ, 0);
+            }
+        }
+    } else {
+        char req[BUFSZ]; // Variável para armazenar a instrução recebida
+        char res[BUFSZ];
+
+        sprintf(res, "REQ_ADDPEER");
+        //send recv
+        send(p2p_socket, res, BUFSZ, 0);
+
+        if (recv(p2p_socket, req, BUFSZ, 0) < 0){
+                perror("recv server client");
+            } else {
+                int PidM = 1;
+                // FICA PARADO
+                if(strcmp(req, "RES_ADDPEER(1)")){
+
+                    printf("New peer ID: 1\n");
+            }
+        }
+    }
+
     while(TRUE) 
     {
         //clear the socket set
@@ -348,7 +337,8 @@ int main(int argc , char **argv)
                     strncpy(comando, buffer, sizeof(comando) - 1);
                     comando[strcspn(comando, "\n")] = '\0';
                     printf("Comando recebido: %s\n", comando);
-                    // bzero(buffer, strlen(buffer)); // Limpa o buffer
+                    bzero(buffer, BUFSZ); // Limpa o buffer
+
 
 
                     // Trata o comando
@@ -368,7 +358,7 @@ int main(int argc , char **argv)
                         // Logica externa
                         char *mensagem = "REQ_LS";
                             if (mensagem != NULL) {
-                                send(p2p_socket, mensagem, strlen(mensagem), 0);
+                                send(new_p2p_socket, mensagem, strlen(mensagem), 0);
                                 char *msg_external = recv(p2p_socket , buffer, BUFSZ, 0);
                                 send(sd, msg_external, strlen(msg_external), 0);
                                 free(mensagem);

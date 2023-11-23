@@ -84,13 +84,13 @@ int main(int argc, char **argv)
     int s = socket(storage.ss_family, SOCK_STREAM, 0); // CRIA SOCKET CONEXÃO INTERNET COM TCP (lib types e socket)
     if (s == -1)
     {
-        logExit("socket");
+        perror("socket");
     }
 
     struct sockaddr *addr = (struct sockaddr *)(&storage); // instanciação do endereço
     if (0 != connect(s, addr, sizeof(storage)))            // CONECTA NO SOCKET
     {
-        logExit("connect");
+        perror("connect");
     }
 
     char addrstr[BUFSZ];
