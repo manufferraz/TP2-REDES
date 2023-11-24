@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 
 #define BUFSZ 1024
+int IdC = 1 ;
 
 void usage(int argc, char **argv)
 {
@@ -99,86 +100,88 @@ int main(int argc, char **argv)
     int selected = 0;
 
     while (1) {
-    char buf[BUFSZ];
-    char string[BUFSZ]; // Variável para armazenar a string recebida
-    char mensagem[BUFSZ]; // Variável para armazenar a mensagem recebida
+        char buf[BUFSZ];
+        char string[BUFSZ]; // Variável para armazenar a string recebida
+        char mensagem[BUFSZ]; // Variável para armazenar a mensagem recebida
 
-    memset(buf, 0, BUFSZ);
+        memset(buf, 0, BUFSZ);
 
-    // Recebe o instrução do terminal
-    fgets(buf, sizeof(buf), stdin);
-    strncpy(string, buf, sizeof(string) - 1);
+        // Recebe o instrução do terminal
+        fgets(buf, sizeof(buf), stdin);
+        strncpy(string, buf, sizeof(string) - 1);
 
-    bzero(buf, strlen(buf)); // Limpa o buffer
+        bzero(buf, strlen(buf)); // Limpa o buffer
 
-    // Remova a quebra de linha do final da string
-    string[strcspn(string, "\n")] = '\0';
+        // Remova a quebra de linha do final da string
+        string[strcspn(string, "\n")] = '\0';
 
-    // Processa a instrução e cria um array de elementos
-    char *instrucao[BUFSZ];
-    int numTokens = 0;
+        // Processa a instrução e cria um array de elementos
+        char *instrucao[BUFSZ];
+        int numTokens = 0;
 
-    for (int i = 0; i < BUFSZ; i++ ){
-        instrucao[i] = "-1";
-    }
+        for (int i = 0; i < BUFSZ; i++ ){
+            instrucao[i] = "-1";
+        }
 
-    char temp[BUFSZ];
-    strcpy(temp, string); 
-    char *token = strtok(temp, " ");
-    while (token != NULL) {
-        instrucao[numTokens++] = token;
-        token = strtok(NULL, " ");
-    }
+        char temp[BUFSZ];
+        strcpy(temp, string); 
+        char *token = strtok(temp, " ");
+        while (token != NULL) {
+            instrucao[numTokens++] = token;
+            token = strtok(NULL, " ");
+        }
 
 
-    // Verifica se a primeira posição do array é igual a "install"
-    if (numTokens > 0 && strcmp(instrucao[0], "show") == 0) {
-        if (numTokens > 0 && strcmp(instrucao[1], "localmaxsensor") == 0) {
-            char *comando = TrataLocalMaxSensor();
-            if (comando != NULL) {
-                send(s, comando, strlen(comando), 0);
-                free(comando);
+        // Verifica se a primeira posição do array é igual a "install"
+        if (numTokens > 0 && strcmp(instrucao[0], "show") == 0) {
+            if (numTokens > 0 && strcmp(instrucao[1], "localmaxsensor") == 0) {
+                char *comando = TrataLocalMaxSensor();
+                if (comando != NULL) {
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
+            } else if (numTokens > 0 && strcmp(instrucao[1], "externalmaxsensor") == 0) {
+                char *comando = TrataExternalMaxSensor();
+                if (comando != NULL) {
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
+            } else if (numTokens > 0 && strcmp(instrucao[1], "localpotency") == 0) {
+                char *comando = TrataLocalPotency();
+                if (comando != NULL) {
+                    printf("%s", comando);
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
+            } else if (numTokens > 0 && strcmp(instrucao[1], "externalpotency") == 0) {
+                char *comando = TrataExternalPotency();
+                if (comando != NULL) {
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
+            } else if (numTokens > 0 && strcmp(instrucao[1], "globalmaxsensor") == 0) {
+                char *comando = TrataGlobalMaxSensor();
+                if (comando != NULL) {
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
+            } else if (numTokens > 0 && strcmp(instrucao[1], "globalmaxnetwork") == 0) {
+                char *comando = TrataGlobalMaxNetwork();
+                if (comando != NULL) {
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
+            } else {
+                close(s);
+                printf("Invalid command.\n");
+                exit(EXIT_SUCCESS);
             }
-        } else if (numTokens > 0 && strcmp(instrucao[1], "externalmaxsensor") == 0) {
-            char *comando = TrataExternalMaxSensor();
-            if (comando != NULL) {
-                send(s, comando, strlen(comando), 0);
-                free(comando);
-            }
-        } else if (numTokens > 0 && strcmp(instrucao[1], "localpotency") == 0) {
-            char *comando = TrataLocalPotency();
-            if (comando != NULL) {
-                printf("%s", comando);
-                send(s, comando, strlen(comando), 0);
-                free(comando);
-            }
-        } else if (numTokens > 0 && strcmp(instrucao[1], "externalpotency") == 0) {
-            char *comando = TrataExternalPotency();
-            if (comando != NULL) {
-                send(s, comando, strlen(comando), 0);
-                free(comando);
-            }
-        } else if (numTokens > 0 && strcmp(instrucao[1], "globalmaxsensor") == 0) {
-            char *comando = TrataGlobalMaxSensor();
-            if (comando != NULL) {
-                send(s, comando, strlen(comando), 0);
-                free(comando);
-            }
-        } else if (numTokens > 0 && strcmp(instrucao[1], "globalmaxnetwork") == 0) {
-            char *comando = TrataGlobalMaxNetwork();
-            if (comando != NULL) {
-                send(s, comando, strlen(comando), 0);
-                free(comando);
-            }
-        } else if (strcmp(string, "kill") == 0) {
-            send(s, string, strlen(string), 0);
-            close(s);
-            printf("Servidor encerrado pelo cliente.\n");
-            exit(EXIT_SUCCESS);
-        } else {
-            close(s);
-            printf("Invalid command.\n");
-            exit(EXIT_SUCCESS);
+        } else if (numTokens > 0 && strcmp(instrucao[0], "kill") == 0) {
+            char *comando = ("REQ_DC(1)");
+                if (comando != NULL) {
+                    send(s, comando, strlen(comando), 0);
+                    free(comando);
+                }
         }
 
         bzero(buf, strlen(buf));
@@ -192,13 +195,17 @@ int main(int argc, char **argv)
             mensagem[strcspn(mensagem, "\n")] = '\0';
 
             printf("mensagem recebida: %s\n", mensagem);
-        }
 
+            if (strcmp(mensagem, "Succesfull disconnect\n") == 0) {
+                printf("%s", instrucao);
+                close(s);
+                exit(EXIT_SUCCESS);
+            }
+        }
     }
-    }
-	close(s);
+    close(s);
     return 0;
-    }
+}
 
 
 

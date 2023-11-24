@@ -211,44 +211,57 @@ int main(int argc , char **argv)
 
         puts("No peer found, starting to listen...");
 
-        int new_p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen);
-        if (new_p2p_socket < 0) {
+        p2p_socket = accept(p2p_socket, (struct sockaddr *)&address_p2p, (socklen_t*)&caddrlen);
+        if (p2p_socket < 0) {
             perror("p2p accept failed");
         } else {
-            printf("Peer 2 connected\n");
+            //printf("Peer 2 connected\n");
 
             char req[BUFSZ];
             char res[BUFSZ];
 
-            if (recv(new_p2p_socket, req, BUFSZ, 0) < 0) {
+            if (recv(p2p_socket, req, BUFSZ, 0) < 0) {
                 perror("recv server server");
             } else {
+                printf("Entra aqui");
                 int PidM = 1;
-                if(strcmp(req, "REQ_ADDPEER")){
+                if(strcmp(req, "REQ_ADDPEER\n")){
 
-                    printf("Peer %d connected\n", PidM);
-                    sprintf(res, "RES_ADDPEER(%d)", PidM);
+                    printf("Peer 1 connected\n");
+                    printf("New peer ID: 2\n");
+                    sprintf(res, "RES_ADDPEER(1)");
                 }
-                    send(new_p2p_socket, res, BUFSZ, 0);
+                    send(p2p_socket, res, BUFSZ, 0);
             }
         }
     } else {
-        char req[BUFSZ]; // Variável para armazenar a instrução recebida
+
+        char req[BUFSZ]; 
         char res[BUFSZ];
 
         sprintf(res, "REQ_ADDPEER");
         //send recv
         send(p2p_socket, res, BUFSZ, 0);
 
-        if (recv(p2p_socket, req, BUFSZ, 0) < 0){
-                perror("recv server client");
-            } else {
-                int PidM = 1;
-                // FICA PARADO
-                if(strcmp(req, "RES_ADDPEER(1)")){
+        if (recv(p2p_socket, req, BUFSZ, 0) < 0)
+        {
+            perror("recv server client");
+        } else {
+            if(strcmp(req, "RES_ADDPEER(1)\n"))
+            {
 
-                    printf("New peer ID: 1\n");
-            }
+                printf("New peer ID: 1\n");
+                printf("Peer 2 connected.\n");
+
+            } 
+            // else if (strcmp(req, "REQ_LP\n"))
+            // {
+            //     char *mensagem = TrataLocalPotency();
+            //     if (mensagem != NULL) {
+            //         send(p2p_socket, mensagem, strlen(mensagem), 0);
+            //         free(mensagem);
+            //     }
+            // }
         }
     }
 
@@ -313,22 +326,22 @@ int main(int argc , char **argv)
 
         //accept the incoming connection
         addrlen = sizeof(address);
-
-
         char comando[BUFSZ]; // Variável para armazenar a instrução recebida
+
 
         //else its some IO operation on some other socket :)
         for (i = 0; i < max_clients; i++) 
         {
-            char buf[BUFSZ];
-            char comando[BUFSZ]; // Variável para armazenar a instrução recebida
-
-            memset(buf, 0, BUFSZ);
+            
+            memset(buffer, 0, BUFSZ);
             sd = client_socket[i];
-              
+
+            
             if (FD_ISSET(sd , &readfds)) 
             {
-                if ((valread = recv(sd , buffer, BUFSZ, 0)) == 0)
+                if (recv(p2p_socket, buffer, BUFSZ, 0)){
+
+                } else if ((valread = recv(sd , buffer, BUFSZ, 0)) == 0)
                 {
                     close( sd );
                     client_socket[i] = 0;
@@ -337,36 +350,24 @@ int main(int argc , char **argv)
                     strncpy(comando, buffer, sizeof(comando) - 1);
                     comando[strcspn(comando, "\n")] = '\0';
                     printf("Comando recebido: %s\n", comando);
-                    bzero(buffer, BUFSZ); // Limpa o buffer
-
-
+                    bzero(buffer, sizeof(comando)); // Limpa o buffer
 
                     // Trata o comando
-                    if (strcmp(comando, "REQ_LS") == 0) {
+                    if (strcmp(comando, "REQ_LS\n") == 0) {
                         char *mensagem = TrataLocalMaxSensor();
                         if (mensagem != NULL) {
                             send(sd, mensagem, strlen(mensagem), 0);
                             free(mensagem);
                         }
-                    } else if (strcmp(comando, "REQ_LP") == 0) {
+                    } else if (strcmp(comando, "REQ_LP\n") == 0) {
                         char *mensagem = TrataLocalPotency();
                             if (mensagem != NULL) {
                                 send(sd, mensagem, strlen(mensagem), 0);
                                 free(mensagem);
                             }
-                    } else if (strcmp(comando, "REQ_ES") == 0) {
+                    } else if (strcmp(comando, "REQ_ES\n") == 0) {
                         // Logica externa
                         char *mensagem = "REQ_LS";
-                            if (mensagem != NULL) {
-                                send(new_p2p_socket, mensagem, strlen(mensagem), 0);
-                                char *msg_external = recv(p2p_socket , buffer, BUFSZ, 0);
-                                send(sd, msg_external, strlen(msg_external), 0);
-                                free(mensagem);
-                                free(msg_external);
-                            }
-                    } else if (strcmp(comando, "REQ_EP") == 0) {
-                        // Logica externa
-                        char *mensagem = "REQ_LP";
                             if (mensagem != NULL) {
                                 send(p2p_socket, mensagem, strlen(mensagem), 0);
                                 char *msg_external = recv(p2p_socket , buffer, BUFSZ, 0);
@@ -374,21 +375,43 @@ int main(int argc , char **argv)
                                 free(mensagem);
                                 free(msg_external);
                             }
-                    } else if (strcmp(comando, "REQ_MS") == 0) {
+                    } else if (strcmp(comando, "REQ_EP\n") == 0) {
+                        // Logica externa
+                        char *mensagem = "REQ_LP\n";
+                            send(p2p_socket, mensagem, BUFSZ, 0);
+                            printf("mandou");
+
+                    } else if (strcmp(comando, "REQ_MS\n") == 0) {
                         char *mensagem = TrataGlobalMaxSensor();
                             if (mensagem != NULL) {
                                 send(sd, mensagem, strlen(mensagem), 0);
                                 free(mensagem);
                             }
-                    }else if (strcmp(comando, "REQ_MN") == 0) {
+                    } else if (strcmp(comando, "REQ_MN\n") == 0) {
                         char *mensagem = TrataGlobalMaxSensor();
                             if (mensagem != NULL) {
                                 send(sd, mensagem, strlen(mensagem), 0);
                                 free(mensagem);
                             }
-                    }     
+                    } else if (strcmp(comando, "REQ_DC(1)\n") == 0) {
+                        char *mensagem = "Succesfull disconnect";
+                        printf("Client 1 removed.\n");
+                        send(sd, mensagem, strlen(mensagem), 0);
+                        free(mensagem);
+                    }  
                 }
+                // if (recv(p2p_socket, buffer, BUFSZ, 0)){
+                //     if (strcmp(buffer, "REQ_LP\n") == 0) {
+                //             char *mensagem = TrataLocalPotency();
+                //                 if (mensagem != NULL) {
+                //                     printf("recebe");
+                //                     send(p2p_socket, mensagem, strlen(mensagem), 0);
+                //                     free(mensagem);
+                //                 }
+                //         }
+                // }  
             } 
         }
+
     }
 }
