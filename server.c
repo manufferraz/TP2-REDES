@@ -55,29 +55,6 @@ char* TrataLocalMaxSensor()
     return mensagem;
 }
 
-char* TrataExternalMaxSensor() 
-{
-    // Encontrar o sensor com a maior potência útil
-    double maxPotUtil = 0;
-    int sensorId = -1;
-
-    for (int i = 0; i < NUM_SENSORES; ++i) {
-        double potUtil = sensores[i].potencia * sensores[i].eficiencia_energetica / 100.0;
-
-        if (potUtil > maxPotUtil) {
-            maxPotUtil = potUtil;
-            sensorId = sensores[i].id;
-        }
-    }
-
-    // Alocar espaço para a mensagem
-        char *mensagem = (char *)malloc(BUFSZ); 
-    // Construir a mensagem
-    sprintf(mensagem, "local %d sensor %d: %.2f (%.2f %.2f)", sensores[sensorId - 1].id, sensorId, maxPotUtil, sensores[sensorId - 1].potencia, sensores[sensorId - 1].eficiencia_energetica);        
-    
-    return mensagem;
-
-}
 
 char* TrataLocalPotency() 
 {
@@ -92,26 +69,6 @@ double somatorio = 0;
     sprintf(mensagem, "local PidMi potency: %.2f", somatorio);
 
     return mensagem;
-}
-
-char* TrataExternalPotency() 
-{
-
-        char *mensagem = (char *)malloc(BUFSZ); 
-        snprintf(mensagem, BUFSZ, "REQ_LP");
-        
-        return mensagem;
-
-}
-
-char* TrataGlobalMaxSensor() 
-{
-
-        char *mensagem = (char *)malloc(BUFSZ); 
-        snprintf(mensagem, BUFSZ, "REQ_LP");
-        
-        return mensagem;
-
 }
 
  
@@ -223,14 +180,13 @@ int main(int argc , char **argv)
             if (recv(p2p_socket, req, BUFSZ, 0) < 0) {
                 perror("recv server server");
             } else {
-                printf("Entra aqui");
                 int PidM = 1;
                 if(strcmp(req, "REQ_ADDPEER\n")){
 
                     printf("Peer 1 connected\n");
                     printf("New peer ID: 2\n");
                     sprintf(res, "RES_ADDPEER(1)");
-                }
+                } 
                     send(p2p_socket, res, BUFSZ, 0);
             }
         }
@@ -240,8 +196,9 @@ int main(int argc , char **argv)
         char res[BUFSZ];
 
         sprintf(res, "REQ_ADDPEER");
-        //send recv
         send(p2p_socket, res, BUFSZ, 0);
+
+        //send recv
 
         if (recv(p2p_socket, req, BUFSZ, 0) < 0)
         {
@@ -263,6 +220,23 @@ int main(int argc , char **argv)
             //     }
             // }
         }
+
+        while(true){
+
+            char buf[BUFSZ];
+            char res[BUFSZ];
+
+            if (fgets(buf, sizeof(buf), stdin) != NULL && buf[0] != '\n') {
+            // Algo foi digitado, remove a nova linha se presente
+            buf[strcspn(buf, "\n")] = '\0';
+            strncpy(res, buf, sizeof(res) - 1);
+            send(p2p_socket, res, BUFSZ, 0);
+            }
+        
+            if(recv(p2p_socket, buf, sizeof(buf), 0)){
+                printf("está recebendo: %s\n", buf);
+            }
+    }
     }
 
     while(TRUE) 
@@ -328,7 +302,6 @@ int main(int argc , char **argv)
         addrlen = sizeof(address);
         char comando[BUFSZ]; // Variável para armazenar a instrução recebida
 
-
         //else its some IO operation on some other socket :)
         for (i = 0; i < max_clients; i++) 
         {
@@ -339,14 +312,12 @@ int main(int argc , char **argv)
             
             if (FD_ISSET(sd , &readfds)) 
             {
-                if (recv(p2p_socket, buffer, BUFSZ, 0)){
-
-                } else if ((valread = recv(sd , buffer, BUFSZ, 0)) == 0)
+                if ((valread = recv(sd , buffer, BUFSZ, 0)) == 0)
                 {
                     close( sd );
                     client_socket[i] = 0;
 
-                } else {
+                }else {
                     strncpy(comando, buffer, sizeof(comando) - 1);
                     comando[strcspn(comando, "\n")] = '\0';
                     printf("Comando recebido: %s\n", comando);
@@ -399,7 +370,7 @@ int main(int argc , char **argv)
                         send(sd, mensagem, strlen(mensagem), 0);
                         free(mensagem);
                     }  
-                }
+                } 
                 // if (recv(p2p_socket, buffer, BUFSZ, 0)){
                 //     if (strcmp(buffer, "REQ_LP\n") == 0) {
                 //             char *mensagem = TrataLocalPotency();
